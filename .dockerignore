@@ -1,0 +1,12 @@
+.git
+.gitignore
+.env
+.smoke
+data
+models
+docs
+tests
+__pycache__
+*.pyc
+.venv
+venv

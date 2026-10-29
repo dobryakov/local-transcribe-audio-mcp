@@ -1,0 +1,62 @@
+# Two services from one image (design §4, §9.1):
+#   api    — FastAPI REST + MCP, light, on the Caddy network + localhost.
+#   worker — one process, CPU/RAM-limited, no inbound network.
+# Both share the /data bind mount (SQLite WAL queue + transcripts) and /models.
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    image: transcribator:latest        # worker reuses this built image
+    container_name: transcribator-api
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      MODELS_DIR: /models
+    volumes:
+      - ./data:/data
+      - ./models:/models
+    ports:
+      - "127.0.0.1:8080:8080"          # local Claude Code; public access via Caddy
+    cpus: "0.5"
+    mem_limit: 512m
+    restart: unless-stopped
+    networks: [internal, caddy]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    image: transcribator:latest        # built by the api service
+    container_name: transcribator-worker
+    depends_on: [api]
+    command: python -m worker.main
+    env_file: .env
+    environment:
+      DATA_DIR: /data
+      MODELS_DIR: /models
+      OMP_NUM_THREADS: "3"
+      CPU_THREADS: "3"
+      SHERPA_CLUSTER_THRESHOLD: "0.5"
+      # faster-whisper models download lazily into /models on first use. Flip to
+      # "1" only after pre-fetching the whisper model there (download_models.py
+      # currently fetches only the open sherpa models).
+      HF_HUB_OFFLINE: "0"
+    volumes:
+      - ./data:/data
+      - ./models:/models
+    cpus: "3"                          # leave 1 vCPU for the neighbouring sites
+    mem_limit: 4g
+    memswap_limit: 5g
+    restart: unless-stopped
+    networks: [internal]               # worker never talks to the outside
+
+networks:
+  internal:
+  caddy:
+    external: true
+    name: n8n-docker-caddy_default
