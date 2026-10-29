@@ -120,7 +120,7 @@ class Diarizer(Protocol):
                     │ http://127.0.0.1         │ https                    │ https (remote connector)
                     ▼                          ▼                          ▼
              ┌──────────────────────────── Caddy (TLS) ───────────────────────────┐
-             │                    transcribe.dobryakov.net → api:8080                   │
+             │                    transcribe.<YOUR-HOST>.net → api:8080                   │
              └────────────────────────────────────┬────────────────────────────────┘
                                                   ▼
   ┌──────────────────────────── api (FastAPI) ───────────────────────────────────┐
@@ -237,7 +237,7 @@ PyTorch и CTranslate2 не всегда честно отдают память 
 curl -H "Authorization: Bearer $TRANSCRIBATOR_KEY" \
   -F file=@interview.m4a -F language=multi -F num_speakers=2 \
   -F title="Собеседование Backend" \
-  https://transcribe.dobryakov.net/v1/jobs
+  https://transcribe.<YOUR-HOST>.net/v1/jobs
 ```
 
 ### 6.2 MCP-инструменты
@@ -263,7 +263,7 @@ curl -H "Authorization: Bearer $TRANSCRIBATOR_KEY" \
 
 | Клиент | Как загружать | Как Claude работает дальше |
 |---|---|---|
-| **Claude Code на этом сервере** | Claude сам делает `curl -F file=@/path …` на `http://127.0.0.1:8080/v1/jobs` (файл уже на сервере или скачан) | MCP: `wait_for_job` → `get_transcript` |
+| **Claude Code на этом сервере** | Claude сам делает `curl -F file=@/path …` на `http://127.0.0.1:18080/v1/jobs` (файл уже на сервере или скачан) | MCP: `wait_for_job` → `get_transcript` |
 | **Claude Code на ноутбуке** | Claude сам делает `curl` на публичный URL с локальным файлом | То же |
 | **Claude.ai / Desktop** | См. варианты ниже | То же |
 
@@ -294,10 +294,10 @@ API_KEYS=claude-code:5e88…,laptop:9f86…,claudeai:2c26…
 **MCP-авторизация по клиентам:**
 - *Claude Code (здесь и на ноуте):* заголовок `Authorization: Bearer …`:
   ```bash
-  claude mcp add --transport http transcribator https://transcribe.dobryakov.net/mcp \
+  claude mcp add --transport http transcribator https://transcribe.<YOUR-HOST>.net/mcp \
     --header "Authorization: Bearer $TRANSCRIBATOR_KEY"
   ```
-  На этом сервере вместо публичного URL — `http://127.0.0.1:8080/mcp`.
+  На этом сервере вместо публичного URL — `http://127.0.0.1:18080/mcp`.
 - *Claude.ai / Desktop (remote custom connector):* в интерфейсе коннектора нельзя задать произвольный заголовок. Решение для v1 и возможный апгрейд:
   1. **Секрет в пути URL** (`https://…/mcp/k/<длинный-секрет>`) — **выбрано для v1.** Проще всего: длинный случайный секрет в URL коннектора, сравнение `hmac.compare_digest`. Минус — секрет живёт в URL и может попасть в логи, поэтому `/mcp/k/*` исключается из access-логов, а секрет хранится в БД только хешем.
   2. **Минимальный OAuth-сервер внутри сервиса** (апгрейд на будущее): metadata-эндпоинты, dynamic client registration, страница `/authorize`, где нужно один раз ввести свой API-ключ, затем выдача access/refresh-токенов. Это ~200 строк, и есть готовые хелперы в MCP SDK. Переходим на него, если секрет-в-URL окажется неудобным или появятся другие пользователи.
@@ -313,7 +313,7 @@ API_KEYS=claude-code:5e88…,laptop:9f86…,claudeai:2c26…
 - Права на volume `0700`, бэкап `/data/transcripts` + `db.sqlite` в общий бэкап сервера. Опционально — шифрование диска/volume.
 - Обработка полностью локальная, аудио и текст никуда не уходят. HF-токен нужен только при скачивании моделей, в рантайме `HF_HUB_OFFLINE=1`.
 
-**Сеть:** контейнер `api` слушает только docker-сеть Caddy и `127.0.0.1:8080`. `worker` в сеть наружу не ходит. В Caddy настраиваются `request_body max_size 2GB`, увеличенные таймауты на upload и (опционально) rate-limit на `/u/*` и `/v1/*`.
+**Сеть:** контейнер `api` слушает только docker-сеть Caddy и `127.0.0.1:18080` (внутри контейнера — 8080). `worker` в сеть наружу не ходит. В Caddy настраиваются `request_body max_size 2GB`, увеличенные таймауты на upload и (опционально) rate-limit на `/u/*` и `/v1/*`.
 
 ---
 
@@ -429,7 +429,7 @@ transcribator/
 
 **Caddy** (в существующий Caddyfile):
 ```
-transcribe.dobryakov.net {
+transcribe.<YOUR-HOST>.net {
     request_body { max_size 2GB }
     reverse_proxy transcribator-api:8080 {
         transport http { read_timeout 30m write_timeout 30m }
@@ -441,7 +441,7 @@ transcribe.dobryakov.net {
 **.env:**
 ```
 API_KEYS=...
-PUBLIC_BASE_URL=https://transcribe.dobryakov.net
+PUBLIC_BASE_URL=https://transcribe.<YOUR-HOST>.net
 HF_TOKEN=...            # только для scripts/download_models.py
 DEFAULT_LANGUAGE=en
 DEFAULT_MODEL=large-v3-turbo
@@ -463,7 +463,7 @@ PAUSE_SPLIT_S=2
 | **0. Бенчмарк** (½ дня) | `scripts/bench.py`: на реальной записи 10–15 мин en+ru замер RTF и пиковой RAM для `small/medium/large-v3-turbo` и `pyannote/sherpa` при `cpus=3` | Есть таблица фактических цифр; подтверждены дефолты модели и бэкенда. **Проверка `multi` уже выполнена (2026-10-29):** на реальном аудио `multi`/`ru` не переводят русский, `en` переводит — см. §14. Остаётся замер RTF/RAM на длинной записи |
 | **1. Ядро** | Worker с этапами convert → diarize (pyannote) → ASR → merge → Markdown; SQLite-очередь; REST `jobs`; ключи; docker compose с лимитами | `curl` 2-часовой записи → корректный Markdown со спикерами и таймингами; сайты не тормозят во время обработки; аудио удалено |
 | **2. MCP локально** | FastMCP на `/mcp`, все инструменты из §6.2, части транскрипта, `wait_for_job`; бэкенд `sherpa` | Claude Code на этом сервере сам загружает файл curl-ом, дожидается и читает транскрипт |
-| **3. Наружу** | Поддомен `transcribe.dobryakov.net` в Caddy, одноразовые ссылки + страница загрузки, авторизация Claude.ai через секрет в URL (`/mcp/k/<секрет>`), CLI `transcribe-upload` | Работают Claude Code с ноутбука и приложение Claude (телефон) через connector + upload link |
+| **3. Наружу** | Поддомен `transcribe.<YOUR-HOST>.net` в Caddy, одноразовые ссылки + страница загрузки, авторизация Claude.ai через секрет в URL (`/mcp/k/<секрет>`), CLI `transcribe-upload` | Работают Claude Code с ноутбука и приложение Claude (телефон) через connector + upload link |
 | **4. Эксплуатация** | Cron-чистка, retry, бэкап, `/healthz` в мониторинг, ротация логов | — |
 
 ## 13. Бэклог (после v1)
@@ -494,7 +494,7 @@ PAUSE_SPLIT_S=2
 
 Зафиксировано 2026-10-29:
 
-1. **Домен** — `transcribe.dobryakov.net`.
+1. **Домен** — `transcribe.<YOUR-HOST>.net`.
 2. **Авторизация Claude.ai** — на старте секрет в пути URL (`/mcp/k/<секрет>`), OAuth 2.1 как апгрейд на будущее (§8). Claude Code работает по Bearer независимо.
 3. **RAM сервера** — апгрейд до 16 ГБ сейчас не планируется, проектируем под текущие ~3.5 ГБ. Следствие: дефолтную модель (`large-v3-turbo` vs `medium`) подтверждаем замером пиковой RAM на бенчмарке (этап 0); при риске OOM дефолт опускается до `medium`. §9.3 п.1 (апгрейд RAM) неактуален.
 4. **Вариант C** (локальный MCP-мост для Claude Desktop) — **в v1 не нужен**, остаётся в бэклоге §13. Используемые клиенты — приложение Claude на телефоне (→ вариант A) и Claude Code на десктопе (→ прямой `curl`); мост не покрывает ни один из них.

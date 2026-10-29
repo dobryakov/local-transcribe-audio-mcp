@@ -11,6 +11,9 @@ python-multipart>=0.0.9
 pydantic>=2.9,<2.12
 mcp>=1.9,<1.14
 faster-whisper>=1.2,<2
+# PyAV 19 removed av.open(..., metadata_errors=...); faster-whisper 1.2.1 still
+# passes it and crashes on every decode. Drop the pin once FW supports 19.
+av>=11,<19
 python-ulid>=2.7
 
 # Diarization: sherpa backend (open, no token). pyannote backend adds

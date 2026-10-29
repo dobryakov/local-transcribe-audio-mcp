@@ -30,7 +30,7 @@ class Settings:
     data_dir: Path = field(default_factory=lambda: Path(_env("DATA_DIR", "/data")))
     models_dir: Path = field(default_factory=lambda: Path(_env("MODELS_DIR", "/models")))
 
-    public_base_url: str = _env("PUBLIC_BASE_URL", "http://127.0.0.1:8080")
+    public_base_url: str = _env("PUBLIC_BASE_URL", "http://127.0.0.1:18080")
 
     default_language: str = _env("DEFAULT_LANGUAGE", "en")
     default_model: str = _env("DEFAULT_MODEL", "large-v3-turbo")

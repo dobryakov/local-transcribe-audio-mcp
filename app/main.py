@@ -274,26 +274,68 @@ def create_upload_link(
     }
 
 
+# Plain string (not .format / f-string): use single { } in CSS/JS.
 _UPLOAD_PAGE = """<!doctype html><html lang="ru"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Загрузка записи</title>
-<style>body{{font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem}}
-input[type=file]{{display:block;margin:1rem 0}}button{{padding:.6rem 1.2rem;font-size:1rem}}
-.ok{{color:green}}.err{{color:#c00}}</style></head><body>
+<style>
+body{font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem;color:#111}
+input[type=file]{display:block;margin:1rem 0}
+button{padding:.6rem 1.2rem;font-size:1rem}
+button:disabled{opacity:.55}
+.ok{color:green}.err{color:#c00}
+#barwrap{display:none;margin:1rem 0 .4rem;height:.75rem;background:#e8e8e8;border-radius:4px;overflow:hidden}
+#bar{height:100%;width:0;background:#2563eb;transition:width .15s linear}
+#pct{display:none;font-variant-numeric:tabular-nums;font-size:.95rem;color:#333}
+</style></head><body>
 <h1>Загрузка записи</h1>
 <p>Выберите аудиофайл — обработка начнётся автоматически.</p>
-<form id="f"><input type="file" name="file" accept="audio/*,video/*" required>
-<button type="submit">Загрузить</button></form>
+<form id="f">
+<input type="file" name="file" accept="audio/*,video/*" required>
+<button id="btn" type="submit">Загрузить</button>
+</form>
+<div id="barwrap"><div id="bar"></div></div>
+<p id="pct"></p>
 <p id="msg"></p>
 <script>
-const f=document.getElementById('f'),m=document.getElementById('msg');
-f.onsubmit=async e=>{{e.preventDefault();m.textContent='Загрузка…';m.className='';
-const fd=new FormData(f);
-try{{const r=await fetch(location.pathname,{{method:'POST',body:fd}});
-const j=await r.json();
-if(r.ok){{m.textContent='Готово! Задача '+j.job_id+' в очереди.';m.className='ok';f.style.display='none';}}
-else{{m.textContent='Ошибка: '+(j.detail||r.status);m.className='err';}}
-}}catch(err){{m.textContent='Ошибка сети';m.className='err';}}}};
+const f=document.getElementById('f'), btn=document.getElementById('btn');
+const m=document.getElementById('msg'), bar=document.getElementById('bar');
+const barwrap=document.getElementById('barwrap'), pct=document.getElementById('pct');
+function fmt(n){if(n<1024)return n+' B';if(n<1048576)return (n/1024).toFixed(1)+' KB';return (n/1048576).toFixed(1)+' MB';}
+f.onsubmit=e=>{
+  e.preventDefault();
+  const file=f.file.files[0];
+  if(!file)return;
+  m.textContent='';m.className='';
+  btn.disabled=true;
+  barwrap.style.display='block'; pct.style.display='block';
+  bar.style.width='0%'; pct.textContent='0% · 0 / '+fmt(file.size);
+  const fd=new FormData(f);
+  const xhr=new XMLHttpRequest();
+  xhr.open('POST', location.pathname);
+  xhr.upload.onprogress=ev=>{
+    if(!ev.lengthComputable)return;
+    const p=Math.min(100, Math.round(100*ev.loaded/ev.total));
+    bar.style.width=p+'%';
+    pct.textContent=p+'% · '+fmt(ev.loaded)+' / '+fmt(ev.total);
+  };
+  xhr.onload=()=>{
+    let j={};
+    try{j=JSON.parse(xhr.responseText);}catch(_){}
+    if(xhr.status>=200&&xhr.status<300){
+      bar.style.width='100%';
+      pct.textContent='100% · '+fmt(file.size);
+      m.textContent='Готово! Задача '+j.job_id+' в очереди.';
+      m.className='ok'; f.style.display='none';
+    }else{
+      btn.disabled=false;
+      m.textContent='Ошибка: '+(j.detail||xhr.status);
+      m.className='err';
+    }
+  };
+  xhr.onerror=()=>{btn.disabled=false;m.textContent='Ошибка сети';m.className='err';};
+  xhr.send(fd);
+};
 </script></body></html>"""
 
 

@@ -10,7 +10,9 @@ services:
       dockerfile: docker/Dockerfile
     image: transcribator:latest        # worker reuses this built image
     container_name: transcribator-api
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8080
+    # forwarded-allow-ips: Caddy sits on the docker network, not 127.0.0.1;
+    # without this, /mcp → /mcp/ redirects rewrite https → http and break clients.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8080 --proxy-headers --forwarded-allow-ips=*
     env_file: .env
     environment:
       DATA_DIR: /data
@@ -19,7 +21,9 @@ services:
       - ./data:/data
       - ./models:/models
     ports:
-      - "127.0.0.1:8080:8080"          # local Claude Code; public access via Caddy
+      # Host 18080: 8080 is claimed by stopped jira-clarify-bot; avoid collision.
+      # Inside the container / on the Caddy docker network the port stays 8080.
+      - "127.0.0.1:18080:8080"         # local Claude Code; public access via Caddy
     cpus: "0.5"
     mem_limit: 512m
     restart: unless-stopped

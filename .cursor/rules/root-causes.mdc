@@ -1,0 +1,10 @@
+---
+description: Brief root causes from runtime failures on this server
+alwaysApply: true
+---
+
+# Root causes
+
+- **MCP `/mcp` → `/mcp/` redirect became `http://` behind Caddy:** uvicorn ignored `X-Forwarded-Proto` because `--forwarded-allow-ips` default is only `127.0.0.1`, while Caddy connects from the docker network. Fix: `--proxy-headers --forwarded-allow-ips=*`. Prefer clients use `…/mcp/` with trailing slash.
+- **ASR `TypeError: open() got unexpected keyword argument 'metadata_errors'`:** PyAV 19 removed that kwarg; faster-whisper 1.2.1 still passes it. Pin `av>=11,<19` in `requirements.txt` until a FW release supports PyAV 19.
+- **Upload page reloads with `?file=…` and never POSTs:** `_UPLOAD_PAGE` used `{{`/`}}` as if for `.format()`, but it's a plain string — JS got a SyntaxError, `preventDefault` never ran, form submitted as GET. Use single braces in that HTML.

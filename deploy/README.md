@@ -24,13 +24,13 @@ print("MCP_URL_SECRETS entry:", "claudeai:" + hashlib.sha256(s.encode()).hexdige
 PY
 ```
 
-The connector URL is then `https://transcribe.dobryakov.net/mcp/k/<secret>`.
+The connector URL is then `https://transcribe.<YOUR-HOST>.net/mcp/k/<secret>`.
 Claude Code instead uses a Bearer key:
 
 ```bash
-claude mcp add --transport http transcribator https://transcribe.dobryakov.net/mcp \
+claude mcp add --transport http transcribator https://transcribe.<YOUR-HOST>.net/mcp \
   --header "Authorization: Bearer $TRANSCRIBATOR_KEY"
-# on this server, use http://127.0.0.1:8080/mcp
+# on this server, use http://127.0.0.1:18080/mcp
 ```
 
 ## 2. Download models
@@ -48,7 +48,7 @@ docker compose up -d --build               # sherpa-only image
 # docker compose build --build-arg WITH_PYANNOTE=1 && docker compose up -d
 ```
 
-Add the `transcribe.dobryakov.net` block from [`Caddyfile`](Caddyfile) to the
+Add the `transcribe.<YOUR-HOST>.net` block from [`Caddyfile`](Caddyfile) to the
 existing Caddy stack and reload it.
 
 ## 4. Cron housekeeping

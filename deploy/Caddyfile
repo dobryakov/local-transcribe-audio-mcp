@@ -2,7 +2,7 @@
 # transcribator-api must join that stack's docker network (see docker-compose.yml:
 # the external `caddy` network). Auto-TLS is handled by Caddy.
 
-transcribe.dobryakov.net {
+transcribe.<YOUR-HOST>.net {
 	# Hard cap on request body (uploads). This is the real defence against an
 	# unauthenticated giant POST to /u/* — the app's MAX_UPLOAD_MB is enforced
 	# only after the proxy has accepted the body.
