@@ -164,6 +164,20 @@ def mark_failed(job_id: str, error: str) -> None:
         )
 
 
+def requeue(job_id: str) -> Optional[dict]:
+    """Re-queue a failed job. The pipeline resumes from whatever intermediate
+    artifacts survive in the work dir (audio.wav / turns.json / words.json)."""
+    with connect() as conn:
+        cur = conn.execute(
+            """UPDATE jobs SET status='queued', error=NULL, progress=0, stage=NULL,
+               started_at=NULL, finished_at=NULL WHERE id=? AND status='failed'""",
+            (job_id,),
+        )
+        if cur.rowcount == 0:
+            return None
+    return get_job(job_id)
+
+
 def cancel_job(job_id: str) -> bool:
     with connect() as conn:
         cur = conn.execute(

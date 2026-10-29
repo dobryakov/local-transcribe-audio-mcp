@@ -229,6 +229,14 @@ def cancel(job_id: str, label: str = Depends(require_key)) -> dict:
     return _public_status(jobs.get_job(job_id))
 
 
+@app.post("/v1/jobs/{job_id}/retry")
+def retry(job_id: str, label: str = Depends(require_key)) -> dict:
+    job = jobs.requeue(job_id)
+    if not job:
+        raise HTTPException(status_code=409, detail="only failed jobs can be retried")
+    return _public_status(job)
+
+
 @app.delete("/v1/jobs/{job_id}")
 def delete(job_id: str, label: str = Depends(require_key)) -> dict:
     job = jobs.get_job(job_id)

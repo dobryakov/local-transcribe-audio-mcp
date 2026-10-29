@@ -3,6 +3,7 @@ subprocesses so model memory is returned to the OS between them (design §4).
 """
 from __future__ import annotations
 
+import json
 import multiprocessing as mp
 from pathlib import Path
 
@@ -46,23 +47,32 @@ def run_job(job: dict) -> None:
     work_dir = settings.work_dir / job_id
     work_dir.mkdir(parents=True, exist_ok=True)
 
-    originals = list(work_dir.glob("original.*"))
-    if not originals:
-        raise FileNotFoundError(f"no uploaded file in {work_dir}")
-    original = originals[0]
+    wav_path = work_dir / "audio.wav"
+    convert_meta = work_dir / "convert.json"
 
-    # 1) convert (light, in-process)
-    jobs.update_progress(job_id, "convert", 0.0)
-    meta = convert.convert(original, work_dir)
-    wav, duration = meta["wav"], meta["duration_s"]
+    # 1) convert (light, in-process). Resumable: if a previous run already
+    # produced audio.wav (e.g. the worker restarted or this is a retry), reuse
+    # it instead of re-converting — the original is deleted after conversion.
+    if wav_path.exists() and convert_meta.exists():
+        duration = json.loads(convert_meta.read_text())["duration_s"]
+        wav = str(wav_path)
+    else:
+        originals = list(work_dir.glob("original.*"))
+        if not originals:
+            raise FileNotFoundError(f"no uploaded file in {work_dir}")
+        jobs.update_progress(job_id, "convert", 0.0)
+        meta = convert.convert(originals[0], work_dir)
+        wav, duration = meta["wav"], meta["duration_s"]
 
-    # 2) diarize (isolated)
-    jobs.update_progress(job_id, "diarize", 0.0)
-    _isolated("worker.stages.diarize.run", job_id, wav, duration, params)
+    # 2) diarize (isolated) — skip if turns.json already present
+    if not (work_dir / "turns.json").exists():
+        jobs.update_progress(job_id, "diarize", 0.0)
+        _isolated("worker.stages.diarize.run", job_id, wav, duration, params)
 
-    # 3) asr (isolated)
-    jobs.update_progress(job_id, "transcribe", 0.0)
-    _isolated("worker.stages.asr.run", job_id, wav, duration, params)
+    # 3) asr (isolated) — skip if words.json already present
+    if not (work_dir / "words.json").exists():
+        jobs.update_progress(job_id, "transcribe", 0.0)
+        _isolated("worker.stages.asr.run", job_id, wav, duration, params)
 
     # 4) merge + render (light, in-process)
     jobs.update_progress(job_id, "merge", 0.95)
