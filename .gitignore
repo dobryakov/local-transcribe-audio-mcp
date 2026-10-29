@@ -9,10 +9,21 @@ __pycache__/
 .venv/
 venv/
 
-# runtime data & models
+# runtime data
 /data/
-/models/
 *.wav.tmp
+
+# models & ML caches — never commit model weights (like .env, kept out of git)
+/models/
+models/
+.cache/
+**/huggingface/
+*.bin
+*.ct2
+*.onnx
+*.pt
+*.pth
+*.safetensors
 
 # os
 .DS_Store
