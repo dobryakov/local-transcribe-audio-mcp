@@ -24,6 +24,15 @@ def label_for_key(raw: str) -> str | None:
     return None
 
 
+def label_for_secret(secret: str) -> str | None:
+    """Return the label for a URL-path MCP secret if it matches, else None."""
+    candidate = hash_key(secret)
+    for stored_hash, label in settings.mcp_url_secrets.items():
+        if hmac.compare_digest(candidate, stored_hash):
+            return label
+    return None
+
+
 def extract_bearer(authorization: str | None) -> str | None:
     if not authorization:
         return None

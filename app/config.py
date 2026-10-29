@@ -52,6 +52,12 @@ class Settings:
 
     # {sha256hex: label}
     api_keys: dict[str, str] = field(default_factory=lambda: _parse_api_keys(_env("API_KEYS", "")))
+    # Secrets embedded in the MCP URL path (/mcp/k/<secret>) for remote
+    # connectors (Claude.ai) that cannot set an Authorization header. Same
+    # label:sha256 format as API_KEYS. {sha256hex: label}
+    mcp_url_secrets: dict[str, str] = field(
+        default_factory=lambda: _parse_api_keys(_env("MCP_URL_SECRETS", ""))
+    )
 
     @property
     def db_path(self) -> Path:

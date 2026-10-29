@@ -11,7 +11,7 @@ from fastapi import (
 )
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
-from .auth import extract_bearer, label_for_key
+from .auth import extract_bearer, label_for_key, label_for_secret
 from .config import settings
 from .db import init_db
 from .mcp_server import current_label, mcp
@@ -39,10 +39,28 @@ class MCPAuth:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
-        headers = dict(scope.get("headers") or [])
-        auth = headers.get(b"authorization", b"").decode()
-        token = extract_bearer(auth)
-        label = label_for_key(token) if token else None
+
+        label = None
+        # Path relative to the /mcp mount. Secret-in-URL (Claude.ai connector)
+        # hits /mcp/k/<secret>; strip that segment so the inner app sees the
+        # same path as the Bearer case.
+        root = scope.get("root_path", "")
+        full = scope.get("path", "")
+        sub = full[len(root):] if full.startswith(root) else full
+        if sub.startswith("/k/"):
+            secret, _, rest = sub[len("/k/"):].partition("/")
+            label = label_for_secret(secret)
+            if label:
+                # Rewrite to the inner "/" route WITH trailing slash, so the app
+                # serves it directly instead of 307-redirecting to /mcp/ (which
+                # would drop the secret from the path and fail the next request).
+                new_full = root + "/" + rest
+                scope = {**scope, "path": new_full, "raw_path": new_full.encode()}
+        else:
+            headers = dict(scope.get("headers") or [])
+            token = extract_bearer(headers.get(b"authorization", b"").decode())
+            label = label_for_key(token) if token else None
+
         if not label:
             await send({"type": "http.response.start", "status": 401,
                         "headers": [(b"content-type", b"application/json")]})
