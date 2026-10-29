@@ -1,0 +1,7 @@
+# API + worker core (stage 1). Diarization backends (pyannote/sherpa) and
+# MCP are added in later stages with their own extra deps.
+fastapi>=0.115,<0.120
+uvicorn[standard]>=0.30,<0.35
+python-multipart>=0.0.9
+faster-whisper>=1.2,<2
+python-ulid>=2.7

@@ -11,6 +11,7 @@ venv/
 
 # runtime data
 /data/
+.smoke/
 *.wav.tmp
 
 # models & ML caches — never commit model weights (like .env, kept out of git)
