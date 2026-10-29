@@ -12,3 +12,7 @@ pydantic>=2.9,<2.12
 mcp>=1.9,<1.14
 faster-whisper>=1.2,<2
 python-ulid>=2.7
+
+# Diarization: sherpa backend (open, no token). pyannote backend adds
+# torch + pyannote.audio later and needs HF_TOKEN for its gated models.
+sherpa-onnx>=1.10
