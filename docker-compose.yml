@@ -24,6 +24,9 @@ services:
     mem_limit: 512m
     restart: unless-stopped
     networks: [internal, caddy]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/healthz').status==200 else 1)"]
       interval: 30s
@@ -54,6 +57,9 @@ services:
     memswap_limit: 5g
     restart: unless-stopped
     networks: [internal]               # worker never talks to the outside
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "5"}
 
 networks:
   internal:

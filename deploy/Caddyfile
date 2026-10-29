@@ -1,0 +1,42 @@
+# Append to the existing Caddyfile (the n8n-docker-caddy stack).
+# transcribator-api must join that stack's docker network (see docker-compose.yml:
+# the external `caddy` network). Auto-TLS is handled by Caddy.
+
+transcribe.dobryakov.net {
+	# Hard cap on request body (uploads). This is the real defence against an
+	# unauthenticated giant POST to /u/* — the app's MAX_UPLOAD_MB is enforced
+	# only after the proxy has accepted the body.
+	request_body {
+		max_size 2GB
+	}
+
+	# Long timeouts: a 2-hour upload / slow client must not be cut off.
+	reverse_proxy transcribator-api:8080 {
+		transport http {
+			read_timeout 30m
+			write_timeout 30m
+		}
+	}
+
+	# Keep upload-link secrets and MCP URL secrets out of the access log.
+	log {
+		output file /var/log/caddy/transcribe.log
+		format filter {
+			request>uri query {
+				delete token
+			}
+		}
+	}
+
+	# Rate limiting needs the caddy-ratelimit plugin (github.com/mholt/caddy-ratelimit).
+	# If your Caddy build includes it, protect the unauthenticated upload path:
+	#
+	# rate_limit {
+	#     zone uploads {
+	#         match { path /u/* }
+	#         key    {remote_host}
+	#         events 20
+	#         window 1m
+	#     }
+	# }
+}
