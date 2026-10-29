@@ -2,29 +2,66 @@
 from __future__ import annotations
 
 import shutil
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Optional
 
 from fastapi import (
-    Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile,
+    Depends, FastAPI, File, Form, Header, HTTPException, UploadFile,
 )
 from fastapi.responses import HTMLResponse, PlainTextResponse
 
 from .auth import extract_bearer, label_for_key
 from .config import settings
 from .db import init_db
+from .mcp_server import current_label, mcp
 from .models import JobParams
 from .services import jobs, transcripts
 from worker.stages import convert as convert_stage
 
-app = FastAPI(title="Transcribator", version="1.0")
-
 CHUNK = 1024 * 1024
 
+# Build the MCP Streamable-HTTP ASGI app once; its session manager is run from
+# the FastAPI lifespan below (required when the app is mounted, not standalone).
+_mcp_app = mcp.streamable_http_app()
 
-@app.on_event("startup")
-def _startup() -> None:
+
+class MCPAuth:
+    """ASGI middleware: Bearer-auth every /mcp request and stash the key label.
+
+    Claude Code sends `Authorization: Bearer <key>`; remote connectors
+    (Claude.ai) will use the secret-in-URL scheme added in a later stage.
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            return await self.app(scope, receive, send)
+        headers = dict(scope.get("headers") or [])
+        auth = headers.get(b"authorization", b"").decode()
+        token = extract_bearer(auth)
+        label = label_for_key(token) if token else None
+        if not label:
+            await send({"type": "http.response.start", "status": 401,
+                        "headers": [(b"content-type", b"application/json")]})
+            await send({"type": "http.response.body",
+                        "body": b'{"error":"unauthorized"}'})
+            return
+        current_label.set(label)
+        return await self.app(scope, receive, send)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     init_db()
+    async with mcp.session_manager.run():
+        yield
+
+
+app = FastAPI(title="Transcribator", version="1.0", lifespan=lifespan)
+app.mount("/mcp", MCPAuth(_mcp_app))
 
 
 def require_key(authorization: Optional[str] = Header(None)) -> str:

@@ -1,7 +1,14 @@
-# API + worker core (stage 1). Diarization backends (pyannote/sherpa) and
-# MCP are added in later stages with their own extra deps.
+# API + worker core + MCP (stages 1-2). Diarization backends (pyannote/sherpa)
+# are added later with their own extra deps.
+#
+# Version set is pinned as a compatible group: mcp 1.13 needs starlette <0.49
+# (newer mcp pulls starlette 1.x, which breaks fastapi) and a pydantic that
+# still exposes eval_type_backport (<2.12).
 fastapi>=0.115,<0.120
+starlette>=0.40,<0.49
 uvicorn[standard]>=0.30,<0.35
 python-multipart>=0.0.9
+pydantic>=2.9,<2.12
+mcp>=1.9,<1.14
 faster-whisper>=1.2,<2
 python-ulid>=2.7
