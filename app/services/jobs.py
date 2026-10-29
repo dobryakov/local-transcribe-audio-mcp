@@ -191,6 +191,24 @@ def enqueue(job_id: str, source_filename: Optional[str] = None) -> Optional[dict
     return get_job(job_id)
 
 
+def token_is_valid(token: str) -> bool:
+    """Cheap pre-check: is there an unexpired awaiting_upload job for this token?
+    Lets the API reject a bad link before reading the request body."""
+    from ..auth import hash_key
+
+    th = hash_key(token)
+    now = _now()
+    with connect() as conn:
+        row = conn.execute(
+            """SELECT upload_expires_at FROM jobs
+               WHERE upload_token_hash=? AND status='awaiting_upload'""",
+            (th,),
+        ).fetchone()
+    if not row:
+        return False
+    return not (row["upload_expires_at"] and row["upload_expires_at"] < now)
+
+
 def attach_upload(token: str, source_filename: str) -> Optional[dict]:
     """Validate a one-time upload token, bind filename, move to queued."""
     from ..auth import hash_key

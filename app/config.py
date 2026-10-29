@@ -44,6 +44,12 @@ class Settings:
     cpu_threads: int = int(_env("CPU_THREADS", "3"))
     upload_link_ttl_s: int = int(_env("UPLOAD_LINK_TTL_S", "3600"))
 
+    # Only needed to download gated pyannote models; unused at runtime (offline).
+    hf_token: str = _env("HF_TOKEN", "")
+    pyannote_pipeline: str = _env(
+        "PYANNOTE_PIPELINE", "pyannote/speaker-diarization-community-1"
+    )
+
     # {sha256hex: label}
     api_keys: dict[str, str] = field(default_factory=lambda: _parse_api_keys(_env("API_KEYS", "")))
 

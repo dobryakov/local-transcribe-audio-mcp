@@ -13,6 +13,16 @@ WORKDIR /srv
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# Optional pyannote backend: build with --build-arg WITH_PYANNOTE=1 to bake it
+# in (adds torch CPU + pyannote.audio, ~2 GB). Default image uses sherpa only.
+ARG WITH_PYANNOTE=0
+COPY requirements-pyannote.txt .
+RUN if [ "$WITH_PYANNOTE" = "1" ]; then \
+        pip install --no-cache-dir torch==2.8.0 torchaudio==2.8.0 \
+            --index-url https://download.pytorch.org/whl/cpu && \
+        pip install --no-cache-dir -r requirements-pyannote.txt ; \
+    fi
+
 COPY app ./app
 COPY worker ./worker
 COPY scripts ./scripts

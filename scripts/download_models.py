@@ -64,9 +64,30 @@ def fetch_sherpa() -> None:
         print(f"  -> {emb}")
 
 
+def fetch_pyannote() -> None:
+    """Pre-download the gated pyannote pipeline into the HF cache under
+    MODELS_DIR so the worker can run offline. Needs HF_TOKEN and a one-time
+    acceptance of the model terms on huggingface.co."""
+    token = os.environ.get("HF_TOKEN")
+    if not token:
+        print("pyannote: skipped (no HF_TOKEN set)")
+        return
+    os.environ.setdefault("HF_HOME", str(MODELS_DIR / "hf"))
+    name = os.environ.get("PYANNOTE_PIPELINE", "pyannote/speaker-diarization-community-1")
+    print(f"pyannote: fetching {name} into {os.environ['HF_HOME']}")
+    try:
+        from pyannote.audio import Pipeline
+    except ImportError:
+        print("pyannote: pyannote.audio not installed (pip install -r requirements-pyannote.txt)")
+        return
+    Pipeline.from_pretrained(name, token=token)
+    print("  -> cached")
+
+
 def main() -> None:
     print(f"MODELS_DIR = {MODELS_DIR}")
     fetch_sherpa()
+    fetch_pyannote()
     print("done.")
 
 

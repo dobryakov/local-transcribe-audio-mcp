@@ -278,8 +278,12 @@ def upload_page(token: str) -> str:
 
 @app.post("/u/{token}")
 def upload_via_link(token: str, file: UploadFile = File(...)) -> dict:
-    # The token is single-use and validated inside attach_upload. Stream the
-    # file to a temp dir first, then bind it to the job the token points at.
+    # Reject an invalid/expired/used link BEFORE reading the body, so an
+    # unauthenticated caller can't make us stream up to MAX_UPLOAD_MB to disk
+    # and run ffprobe on a bogus token. The token is re-checked atomically in
+    # attach_upload after the file lands (guards the single-use race).
+    if not jobs.token_is_valid(token):
+        raise HTTPException(status_code=404, detail="invalid or expired upload link")
     from .auth import hash_key
     th = hash_key(token)
     tmp = settings.work_dir / f"_pending_{th[:16]}"

@@ -1,0 +1,11 @@
+# Optional: the pyannote diarization backend (diarization=pyannote).
+# Heavy (~2 GB with torch) and the models are gated — needs HF_TOKEN and a
+# one-time acceptance of the model terms on huggingface.co. The default
+# diarization in v1 can be sherpa (light, no token) if you skip this.
+#
+# torch/torchaudio MUST come from the CPU wheel index, so install in two steps:
+#   pip install torch==2.8.0 torchaudio==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements-pyannote.txt
+torch==2.8.0
+torchaudio==2.8.0
+pyannote.audio>=4.0,<5
